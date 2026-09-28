@@ -1,0 +1,61 @@
+# Play namespace connector (wired to farmer-registry Partner API)
+global:
+  hostname: connector.play.openg2p.org
+  postgresqlHost: commons-postgresql
+  postgresqlPort: 5432
+  redisHost: farmer-registry-redis-master
+  redisPort: 6379
+  partnerApiService: farmer-registry-partner-api
+  connectorDB: farmer_registry_connector
+  connectorDBUser: farmer_registry_connector_user
+  connectorDBSecret: farmer-registry-connector
+  connectorDBUserPasswordKey: farmer-registry-connector-db-user
+
+commonEnv:
+  CONNECTOR_CORS_ORIGINS: https://connector.play.openg2p.org
+
+api:
+  image:
+    repository: asierneb/openg2p-connector-service
+    tag: nsr
+    pullPolicy: Always
+
+worker:
+  image:
+    repository: asierneb/openg2p-connector-service
+    tag: nsr
+    pullPolicy: Always
+
+beat:
+  image:
+    repository: asierneb/openg2p-connector-service
+    tag: nsr
+    pullPolicy: Always
+
+ui:
+  image:
+    repository: asierneb/openg2p-connector-ui
+    tag: nsr
+    pullPolicy: Always
+
+istio:
+  enabled: true
+  gateway:
+    create: false
+    name: internal
+  virtualservice:
+    enabled: true
+    gateway: internal
+
+postgres-init:
+  enabled: true
+  postgresql:
+    host: commons-postgresql
+    port: 5432
+    existingSecret: commons-postgresql
+    existingSecretPostgresPasswordKey: postgres-password
+  databases:
+    - name: farmer_registry_connector
+      user: farmer_registry_connector_user
+      secret: farmer-registry-connector
+      secretUserPasswordKey: farmer-registry-connector-db-user

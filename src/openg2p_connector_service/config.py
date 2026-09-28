@@ -27,6 +27,15 @@ class Settings(BaseSettings):
     partner_ingest_base_url: str = "http://localhost:8000"
     partner_ingest_timeout: int = 30
 
+    # Outbound JWT signing against the registry Partner API (connector private key).
+    # Registry verify is out of scope here; headers are attached when enabled.
+    signing_enabled: bool = False
+    signing_private_key_pem: str = ""
+    signing_public_key_pem: str = ""
+    signing_algorithm: str = "RS256"
+    signing_issuer: str = "openg2p-connector"
+    signing_header_name: str = "X-Signature"
+
     # --- celery / redis ---
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/1"

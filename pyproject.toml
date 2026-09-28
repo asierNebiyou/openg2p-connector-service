@@ -26,6 +26,7 @@ dependencies = [
   "celery>=5.3",
   "redis>=5.0",
   "jmespath>=1.0",
+  "PyJWT[crypto]>=2.8",
   "aiokafka>=0.9",
   "aio-pika>=9.0",
   "aiobotocore>=2.5",

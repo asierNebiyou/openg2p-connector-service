@@ -6,9 +6,8 @@ from . import verifier_registry
 
 
 def verify_plain_shared_token(
-    secret: str, body: bytes, headers: dict[str, str]
+    secret: str, body: bytes, headers: dict[str, str], source_config=None
 ) -> None:
-    """Verify a simple shared token passed in the Authorization or X-Webhook-Token header."""
     token = (
         headers.get("x-webhook-token")
         or headers.get("X-Webhook-Token")

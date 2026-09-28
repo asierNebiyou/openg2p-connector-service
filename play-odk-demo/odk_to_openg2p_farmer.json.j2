@@ -1,0 +1,48 @@
+{% set d = expanded if expanded is defined else {} %}
+{% set gender = (d.get('gender') or 'UNKNOWN') | upper %}
+{% if gender not in ['MALE','FEMALE','OTHERS','UNKNOWN'] %}{% set gender = 'UNKNOWN' %}{% endif %}
+{% set income_raw = (d.get('source_of_income') or 'OTHERS') | upper %}
+{% if income_raw in ['CROP_PRODUCTION','SOI_CROP_PRODUCTION'] %}
+  {% set income = 'SOI_CROP_PRODUCTION' %}
+{% elif income_raw in ['LIVESTOCK_PRODUCTION','SOI_LIVESTOCK_PRODUCTION'] %}
+  {% set income = 'SOI_LIVESTOCK_PRODUCTION' %}
+{% elif income_raw in ['GOVERNMENT_NGO_SUPPORT','SOI_GOVERNMENT_NGO_SUPPORT'] %}
+  {% set income = 'SOI_GOVERNMENT_NGO_SUPPORT' %}
+{% else %}
+  {% set income = 'SOI_OTHERS' %}
+{% endif %}
+{% set first = d.get('first_name') or '' %}
+{% set last = d.get('last_name') or '' %}
+{% set fid = d.get('foundational_id') or '' %}
+{
+  "fr_farmer_personal_info": [
+    {
+      "record_name": "{{ (first ~ ' ' ~ last).strip() }}",
+      "foundational_id": "{{ fid }}",
+      "first_name": "{{ first }}",
+      "middle_name": "",
+      "last_name": "{{ last }}",
+      "given_name": "{{ first }}",
+      "birth_date": "{{ (d.get('birth_date') or '').split('T')[0] }}",
+      "gender": "{{ gender }}",
+      "marital_status": "UNKNOWN",
+      "registration_date": "{{ (d.get('registration_date') or '').split('T')[0] }}"
+    }
+  ],
+  "fr_farmer_socio_and_health": [
+    {
+      "has_personal_phone": {{ 'true' if d.get('phone') else 'false' }},
+      "disabled": false,
+      "source_of_income": "{{ income }}",
+      "national_id_masked": "{{ fid }}"
+    }
+  ],
+  "fr_farmer_location": [
+    {
+      "locality": "{{ d.get('locality') or '' }}",
+      "latitude": null,
+      "longitude": null,
+      "registration_date": "{{ (d.get('registration_date') or '').split('T')[0] }}"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<h:html xmlns="http://www.w3.org/2002/xforms" xmlns:h="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:jr="http://openrosa.org/javarosa">
+  <h:head>
+    <h:title>Farmer Registration</h:title>
+    <model>
+      <instance>
+        <data id="farmer_registration" version="20260917">
+          <meta>
+            <instanceID/>
+          </meta>
+          <first_name/>
+          <last_name/>
+          <birth_date/>
+          <gender/>
+          <foundational_id/>
+          <phone/>
+          <source_of_income/>
+          <locality/>
+        </data>
+      </instance>
+      <bind nodeset="/data/meta/instanceID" type="string" readonly="true()" jr:preload="uid"/>
+      <bind nodeset="/data/first_name" type="string" required="true()"/>
+      <bind nodeset="/data/last_name" type="string" required="true()"/>
+      <bind nodeset="/data/birth_date" type="date"/>
+      <bind nodeset="/data/gender" type="string"/>
+      <bind nodeset="/data/foundational_id" type="string" required="true()"/>
+      <bind nodeset="/data/phone" type="string"/>
+      <bind nodeset="/data/source_of_income" type="string"/>
+      <bind nodeset="/data/locality" type="string"/>
+    </model>
+  </h:head>
+  <h:body>
+    <input ref="/data/first_name"><label>First name</label></input>
+    <input ref="/data/last_name"><label>Last name</label></input>
+    <input ref="/data/birth_date"><label>Birth date</label></input>
+    <select1 ref="/data/gender"><label>Gender</label>
+      <item><label>Male</label><value>MALE</value></item>
+      <item><label>Female</label><value>FEMALE</value></item>
+      <item><label>Other</label><value>OTHERS</value></item>
+    </select1>
+    <input ref="/data/foundational_id"><label>National / foundational ID</label></input>
+    <input ref="/data/phone"><label>Phone</label></input>
+    <select1 ref="/data/source_of_income"><label>Source of income</label>
+      <item><label>Crop production</label><value>CROP_PRODUCTION</value></item>
+      <item><label>Livestock</label><value>LIVESTOCK_PRODUCTION</value></item>
+      <item><label>Other</label><value>OTHERS</value></item>
+    </select1>
+    <input ref="/data/locality"><label>Locality</label></input>
+  </h:body>
+</h:html>

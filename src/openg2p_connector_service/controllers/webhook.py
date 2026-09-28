@@ -1,23 +1,16 @@
-"""Webhook endpoints: POST /webhook/{connector_id} and /webhook/by-slug/{slug}.
-
-Signature verification is delegated to pluggable verifiers.  When the
-``process_webhook_task`` Celery task is available, the handler ACKs with
-202 and enqueues heavy processing; otherwise it processes inline.
-"""
-
 import json
 import logging
-import uuid
 
-import jmespath
 from fastapi import APIRouter, HTTPException, Request, Response
-from sqlalchemy import select
+import jmespath
+import uuid
 
 from ..config import get_settings
 from ..database import get_session_factory
 from ..models import ConnectorDefinition
 from ..services import IngestionService
 from ..webhooks.verifiers import verify_webhook
+from sqlalchemy import select
 
 router = APIRouter(prefix="/webhook", tags=["webhook"])
 _logger = logging.getLogger("connector.controller.webhook")
@@ -46,7 +39,6 @@ async def _resolve_connector(
 def _extract_payload(
     body_json: dict, connector: ConnectorDefinition
 ) -> tuple[str | None, dict]:
-    """Return (source_event_id, data) after optional envelope extraction."""
     cfg = connector.get_source_config()
     data_path = cfg.get("webhook_payload_envelope", cfg.get("data_path"))
 
@@ -72,7 +64,13 @@ async def _handle_webhook(connector_id: str, request: Request, *, by_slug: bool 
 
     connector = await _resolve_connector(connector_id, by_slug=by_slug)
     secret = connector.webhook_secret or get_settings().webhook_default_secret
-    verify_webhook(connector.webhook_verifier, secret, raw_body, dict(request.headers))
+    verify_webhook(
+        connector.webhook_verifier,
+        secret or "",
+        raw_body,
+        dict(request.headers),
+        source_config=connector.get_source_config(),
+    )
 
     source_event_id, data = _extract_payload(body_json, connector)
 
@@ -114,7 +112,6 @@ async def _handle_webhook(connector_id: str, request: Request, *, by_slug: bool 
 async def _handle_websub_challenge(
     identifier: str, request: Request, *, by_slug: bool = False
 ) -> Response:
-    """Echo WebSub verification challenges for active push connectors."""
     await _resolve_connector(identifier, by_slug=by_slug)
 
     mode = request.query_params.get("hub.mode")
@@ -125,10 +122,6 @@ async def _handle_websub_challenge(
     return Response(content=challenge, media_type="text/plain")
 
 
-# WebSub hubs (e.g. mosip/kafkaHub) sometimes append "/" on POST delivery
-# even when the subscriber registered the callback without one. Accept both
-# variants so FastAPI's default 307 redirect doesn't break hub deliveries
-# (the hub does not follow 3xx and treats them as content-delivery errors).
 @router.post("/{connector_id}", include_in_schema=True)
 @router.post("/{connector_id}/", include_in_schema=False)
 async def receive_webhook(connector_id: str, request: Request):

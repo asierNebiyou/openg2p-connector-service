@@ -186,6 +186,9 @@ class IngestionService:
                 payload=wrapped,
                 data_model=route["data_model_mnemonic"],
                 connector_id=connector_id,
+                timeout_seconds=connector.get_source_config().get(
+                    "partner_ingest_timeout_seconds"
+                ),
             )
         except Exception as exc:
             category = self._classify_send_error(exc)

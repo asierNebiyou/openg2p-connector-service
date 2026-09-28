@@ -3,6 +3,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from .datetime_ser import OptionalUtcDateTime, UtcDateTime
+
 
 class IngestionRunRead(BaseModel):
     run_id: str
@@ -16,8 +18,8 @@ class IngestionRunRead(BaseModel):
     redelivery_count: int = 0
     connector_name: str | None = None
     run_payload: dict[str, Any] | None = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDateTime
+    updated_at: UtcDateTime
 
     model_config = {"from_attributes": True}
 
@@ -36,7 +38,7 @@ class DLQEntryRead(BaseModel):
     error_category: str | None = None
     attempt_count: int
     connector_name: str | None = None
-    created_at: datetime
+    created_at: UtcDateTime
 
     model_config = {"from_attributes": True}
 

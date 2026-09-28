@@ -1,6 +1,6 @@
-from datetime import datetime
-
 from pydantic import BaseModel, model_validator
+
+from .datetime_ser import OptionalUtcDateTime, UtcDateTime
 
 
 class ConnectorCreate(BaseModel):
@@ -12,7 +12,6 @@ class ConnectorCreate(BaseModel):
     data_model_mnemonic: str | None = None
     mapper_expression: str | None = None
     mapper_version: str | None = None
-    # G2P envelope — required for any data that must reach the registry
     g2p_sender_id: str
     g2p_register_mnemonic: str
     source_config_json: str | None = None
@@ -65,21 +64,20 @@ class ConnectorRead(BaseModel):
     poll_config_json: str | None = None
     max_in_flight: int | None = None
     validation_schema_json: str | None = None
-    last_poll_at: datetime | None = None
+    last_poll_at: OptionalUtcDateTime = None
     last_poll_status: str | None = None
     last_poll_error: str | None = None
     last_poll_fetched: int | None = None
     last_poll_duration_ms: int | None = None
     poll_state_json: str | None = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDateTime
+    updated_at: UtcDateTime
 
     model_config = {"from_attributes": True}
 
     @model_validator(mode="before")
     @classmethod
     def _mask_secrets(cls, data):
-        """Never expose auth_secret_json or webhook_secret on read."""
         if hasattr(data, "__dict__"):
             return data
         data.pop("auth_secret_json", None)

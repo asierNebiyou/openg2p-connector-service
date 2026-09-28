@@ -8,6 +8,7 @@ from ..database import get_session_factory
 from ..models import DeadLetterEntry, IdempotencyKey, IngestionRun, RunStatus
 from ..schemas import ConnectorCreate, ConnectorRead, ConnectorUpdate
 from ..services import ConnectorService
+from ..timeutil import utc_iso
 from ..transports.registry import transport_registry
 from ..webhooks.verifiers import verifier_registry
 
@@ -129,13 +130,13 @@ async def connector_stats(connector_id: str):
         return {
             "connector_id": connector_id,
             "is_active": cd.is_active,
-            "last_poll_at": cd.last_poll_at,
+            "last_poll_at": utc_iso(cd.last_poll_at),
             "last_poll_status": cd.last_poll_status,
             "last_poll_error": cd.last_poll_error,
             "last_poll_fetched": cd.last_poll_fetched,
             "last_poll_duration_ms": cd.last_poll_duration_ms,
             "poll_interval_seconds": interval,
-            "next_poll_at": next_poll_at,
+            "next_poll_at": utc_iso(next_poll_at),
             "dlq_count": int(dlq_count or 0),
             "run_status_counts": status_counts,
             "total_runs": sum(status_counts.values()),
@@ -146,8 +147,8 @@ async def connector_stats(connector_id: str):
                 "source_event_id": last_run.source_event_id,
                 "registry_correlation_id": last_run.registry_correlation_id,
                 "last_error": last_run.last_error,
-                "created_at": last_run.created_at,
-                "updated_at": last_run.updated_at,
+                "created_at": utc_iso(last_run.created_at),
+                "updated_at": utc_iso(last_run.updated_at),
             } if last_run else None,
         }
 

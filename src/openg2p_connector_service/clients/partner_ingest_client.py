@@ -1,10 +1,3 @@
-"""HTTP client for the registry partner ``POST /partner/ingest_data`` endpoint.
-
-The registry ``G2PIngestController`` accepts the raw body as-is (via
-``request.json()``). The optional ``data_model`` query parameter lets us
-hint which DataModel to use if the payload signature is ambiguous.
-"""
-
 import logging
 import time
 from typing import Any
@@ -12,6 +5,7 @@ from typing import Any
 import httpx
 
 from .. import metrics as connector_metrics
+from ..auth.jwt_signing import signature_headers_for
 from ..config import get_settings
 
 _logger = logging.getLogger("connector.client.partner_ingest")
@@ -21,30 +15,34 @@ def _status_class(code: int) -> str:
     return f"{code // 100}xx"
 
 
+def _clamp_timeout(seconds: float | int | None, default: float) -> float:
+    value = float(seconds if seconds is not None else default)
+    return max(5.0, min(value, 300.0))
+
+
 class PartnerIngestClient:
     async def send(
         self,
         payload: dict[str, Any],
         data_model: str | None = None,
         connector_id: str | None = None,
+        timeout_seconds: float | int | None = None,
     ) -> str:
-        """Post *payload* to the registry ingest endpoint.
-
-        Returns the ``correlation_id`` from the registry response.
-        """
         settings = get_settings()
         url = f"{settings.partner_ingest_base_url.rstrip('/')}/partner/ingest_data"
         params: dict[str, str] = {}
         if data_model:
-            # Registry partner API uppercases the mnemonic before DB lookup.
             params["data_model"] = data_model.strip().upper()
+
+        headers = signature_headers_for(payload)
+        timeout = _clamp_timeout(timeout_seconds, settings.partner_ingest_timeout)
 
         t0 = time.perf_counter()
         status_label = "error"
         try:
-            async with httpx.AsyncClient(timeout=settings.partner_ingest_timeout) as client:
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 _logger.info("POST %s data_model=%s", url, data_model)
-                resp = await client.post(url, json=payload, params=params)
+                resp = await client.post(url, json=payload, params=params, headers=headers)
                 status_label = _status_class(resp.status_code)
                 resp.raise_for_status()
                 body = resp.json()
@@ -57,10 +55,6 @@ class PartnerIngestClient:
                 status_class=status_label,
             ).inc()
 
-        # The Partner API always returns HTTP 200 — even on internal errors.
-        # Detect application-level failures via the G2P response envelope and
-        # raise so the connector treats them as failures (→ DLQ) rather than
-        # silently logging them as success with an empty correlation_id.
         response_header = body.get("response_header") or {}
         if response_header.get("response_status") == "ERROR":
             err_code = response_header.get("response_error_code", "")
@@ -69,7 +63,6 @@ class PartnerIngestClient:
                 f"Partner API rejected payload: [{err_code}] {err_msg}"
             )
 
-        # Keys may be present with JSON null — dict.get("k", {}) returns None if k maps to null.
         response_body = body.get("response_body") or {}
         response_payload = response_body.get("response_payload") or {}
         correlation_id = (

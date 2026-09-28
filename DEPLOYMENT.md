@@ -37,29 +37,56 @@ Supported extras match `pyproject.toml`:
 
 ## Runtime roles
 
-The image defaults to `api`. Pass a different first argument to run another
-role.
+One Docker image. Several processes. You choose which process to run by
+passing a role name as the container command (first argument to the entrypoint).
 
-- `api`: FastAPI service on port `8050`
-- `worker`: Celery worker for polling, webhook processing, and ingestion tasks
-- `beat`: Celery beat scheduler for periodic `poll_all`
-- `worker-beat`: single-container worker + beat for small environments
-- `consumer`: event consumer supervisor for Kafka / RabbitMQ / SQS transports
+If you pass nothing, it starts as `api`.
+
+| Role | What it does | When you need it |
+|------|----------------|------------------|
+| `api` | HTTP API on port `8050` (config, webhooks, admin calls) | Always |
+| `worker` | Celery worker: runs poll jobs, webhook handling, and Partner ingest | Always for polling / webhooks |
+| `beat` | Celery beat: schedules periodic `poll_all` on a timer | Always if you use scheduled polling |
+| `worker-beat` | Worker and beat in one process | Tiny demos only (not preferred in prod) |
+| `consumer` | Reads Kafka / RabbitMQ / SQS event transports | Only if you use those transports |
+
+Examples:
+
+```bash
+# API (default, same as omitting the role)
+docker run ... your-registry/openg2p-connector-service:latest
+docker run ... your-registry/openg2p-connector-service:latest api
+
+# Background jobs
+docker run ... your-registry/openg2p-connector-service:latest worker
+docker run ... your-registry/openg2p-connector-service:latest beat
+```
+
+In Kubernetes, set the Deployment `args` to that role, for example
+`args: ["worker"]`. Same image for every Deployment.
 
 ## Recommended production topology
 
-For polling and webhooks, run at least these three workloads:
+For normal polling + webhook setups, run **three** Deployments / containers
+from the same image:
 
-1. `connector-api`
-2. `connector-worker`
-3. `connector-beat`
+| Workload name | Container args | Job |
+|---------------|----------------|-----|
+| `connector-api` | `["api"]` or omit | Serves HTTP |
+| `connector-worker` | `["worker"]` | Executes the jobs |
+| `connector-beat` | `["beat"]` | Fires the poll schedule |
 
-Only add `connector-consumer` if you use event-driven transports such as
-Kafka, RabbitMQ, or SQS.
+Add a fourth only when you use event buses:
 
-For very small deployments you can replace `worker` + `beat` with a single
-`worker-beat` container, but separate workloads are better for scaling and
-restarts.
+| Workload name | Container args | Job |
+|---------------|----------------|-----|
+| `connector-consumer` | `["consumer"]` | Kafka / RabbitMQ / SQS intake |
+
+Do **not** run `consumer` for ODK / REST polling or WebSub webhooks alone.
+
+Small environments: you may run one `worker-beat` instead of separate
+`worker` + `beat`. Prefer separate `worker` and `beat` in production so you
+can scale and restart them independently.
 
 ## Required infrastructure
 

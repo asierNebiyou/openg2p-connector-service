@@ -146,7 +146,7 @@ async def _poll_async(connector_id: str) -> dict:
         connector = await session.get(ConnectorDefinition, connector_id)
         duration_s = time.monotonic() - t0
         if connector is not None:
-            connector.last_poll_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            connector.last_poll_at = datetime.now(timezone.utc)
             connector.last_poll_duration_ms = int(duration_s * 1000)
             connector.last_poll_fetched = stats["fetched"]
             if poll_error is not None:
