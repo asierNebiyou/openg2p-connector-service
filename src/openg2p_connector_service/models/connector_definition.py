@@ -58,14 +58,14 @@ class ConnectorDefinition(Base):
     def get_source_config(self) -> dict:
         import json
 
-        cfg: dict = {}
+        merged_config: dict = {}
         if self.poll_config_json:
-            cfg.update(json.loads(self.poll_config_json))
+            merged_config.update(json.loads(self.poll_config_json))
         if self.source_config_json:
-            cfg.update(json.loads(self.source_config_json))
+            merged_config.update(json.loads(self.source_config_json))
         if self.poll_state_json:
-            cfg.update(json.loads(self.poll_state_json))
-        return cfg
+            merged_config.update(json.loads(self.poll_state_json))
+        return merged_config
 
     def get_poll_state(self) -> dict:
         import json

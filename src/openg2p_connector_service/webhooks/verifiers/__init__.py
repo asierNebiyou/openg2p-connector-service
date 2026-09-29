@@ -6,9 +6,9 @@ verifier_registry: dict[str, Callable[..., None]] = {}
 
 
 def _register(name: str):
-    def decorator(fn: Callable[..., None]):
-        verifier_registry[name] = fn
-        return fn
+    def decorator(verify_function: Callable[..., None]):
+        verifier_registry[name] = verify_function
+        return verify_function
 
     return decorator
 
@@ -31,10 +31,10 @@ def verify_webhook(
         return
     if verifier_name != "jwt_signature" and not secret:
         return
-    fn = verifier_registry.get(verifier_name)
-    if fn is None:
+    verify_function = verifier_registry.get(verifier_name)
+    if verify_function is None:
         raise HTTPException(500, f"Unknown webhook_verifier: {verifier_name!r}")
     try:
-        fn(secret, body, headers, source_config=source_config)
+        verify_function(secret, body, headers, source_config=source_config)
     except TypeError:
-        fn(secret, body, headers)
+        verify_function(secret, body, headers)

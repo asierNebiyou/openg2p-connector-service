@@ -82,7 +82,7 @@ async def _poll_async(connector_id: str) -> dict:
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     ingestion = IngestionService()
     stats = {"connector_id": connector_id, "fetched": 0, "success": 0, "failed": 0}
-    t0 = time.monotonic()
+    started_at = time.monotonic()
     poll_error: str | None = None
 
     async with session_factory() as session:
@@ -144,7 +144,7 @@ async def _poll_async(connector_id: str) -> dict:
         # Reload the connector — the session may have been rolled back internally
         # (expiring attributes) or we may need to mutate it in a fresh tx.
         connector = await session.get(ConnectorDefinition, connector_id)
-        duration_s = time.monotonic() - t0
+        duration_s = time.monotonic() - started_at
         if connector is not None:
             connector.last_poll_at = datetime.now(timezone.utc)
             connector.last_poll_duration_ms = int(duration_s * 1000)
@@ -274,8 +274,10 @@ def _record_checkpoint(record) -> Checkpoint | None:
 
 def _should_poll(connector: ConnectorDefinition, now: datetime) -> bool:
     """Check per-connector poll interval against last_poll_at."""
-    cfg = connector.get_source_config()
-    interval = cfg.get("poll_interval_seconds", _settings.odk_poll_interval_seconds)
+    source_config = connector.get_source_config()
+    interval = source_config.get(
+        "poll_interval_seconds", _settings.odk_poll_interval_seconds
+    )
     if connector.last_poll_at is None:
         return True
     last = connector.last_poll_at

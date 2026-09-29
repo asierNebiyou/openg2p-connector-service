@@ -9,21 +9,23 @@ from ..config import get_settings
 
 def sign_payload(payload: dict[str, Any]) -> str | None:
     settings = get_settings()
-    private_pem = (settings.signing_private_key_pem or "").strip()
-    if not private_pem or not settings.signing_enabled:
+    private_key_pem = (settings.signing_private_key_pem or "").strip()
+    if not private_key_pem or not settings.signing_enabled:
         return None
 
     body = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+    algorithm = settings.signing_algorithm or "RS256"
+    issuer = settings.signing_issuer or "openg2p-connector"
     claims = {
         "body_sha256": hashlib.sha256(body).hexdigest(),
-        "iss": settings.signing_issuer or "openg2p-connector",
+        "iss": issuer,
     }
-    headers = {"alg": settings.signing_algorithm or "RS256", "typ": "JWT"}
+    token_headers = {"alg": algorithm, "typ": "JWT"}
     return jwt.encode(
         claims,
-        private_pem,
-        algorithm=settings.signing_algorithm or "RS256",
-        headers=headers,
+        private_key_pem,
+        algorithm=algorithm,
+        headers=token_headers,
     )
 
 

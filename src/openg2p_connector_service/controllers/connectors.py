@@ -34,8 +34,8 @@ async def connector_meta():
         "auth_types": list(auth_registry.keys()),
         "webhook_verifiers": list(verifier_registry.keys()),
         "transport_hints": {
-            k: _TRANSPORT_HINTS.get(k, "poll")
-            for k in transport_registry
+            transport_type: _TRANSPORT_HINTS.get(transport_type, "poll")
+            for transport_type in transport_registry
         },
     }
 
@@ -49,37 +49,37 @@ async def list_connectors():
 @router.get("/{connector_id}", response_model=ConnectorRead)
 async def get_connector(connector_id: str):
     async with get_session_factory()() as session:
-        cd = await _service.get(connector_id, session)
-        if cd is None:
+        connector = await _service.get(connector_id, session)
+        if connector is None:
             raise HTTPException(404, "Connector not found")
-        return ConnectorRead.model_validate(cd)
+        return ConnectorRead.model_validate(connector)
 
 
 @router.post("", response_model=ConnectorRead, status_code=201)
 async def create_connector(data: ConnectorCreate):
     async with get_session_factory()() as session:
-        cd = await _service.create(data, session)
+        connector = await _service.create(data, session)
         await session.commit()
-        await session.refresh(cd)
-        return ConnectorRead.model_validate(cd)
+        await session.refresh(connector)
+        return ConnectorRead.model_validate(connector)
 
 
 @router.patch("/{connector_id}", response_model=ConnectorRead)
 async def update_connector(connector_id: str, data: ConnectorUpdate):
     async with get_session_factory()() as session:
-        cd = await _service.update(connector_id, data, session)
-        if cd is None:
+        connector = await _service.update(connector_id, data, session)
+        if connector is None:
             raise HTTPException(404, "Connector not found")
         await session.commit()
-        await session.refresh(cd)
-        return ConnectorRead.model_validate(cd)
+        await session.refresh(connector)
+        return ConnectorRead.model_validate(connector)
 
 
 @router.delete("/{connector_id}", status_code=204)
 async def delete_connector(connector_id: str):
     async with get_session_factory()() as session:
-        ok = await _service.delete(connector_id, session)
-        if not ok:
+        deleted = await _service.delete(connector_id, session)
+        if not deleted:
             raise HTTPException(404, "Connector not found")
         await session.commit()
 
@@ -88,8 +88,8 @@ async def delete_connector(connector_id: str):
 async def connector_stats(connector_id: str):
     """Operational snapshot: last poll, run counts by status, DLQ count, next poll ETA."""
     async with get_session_factory()() as session:
-        cd = await _service.get(connector_id, session)
-        if cd is None:
+        connector = await _service.get(connector_id, session)
+        if connector is None:
             raise HTTPException(404, "Connector not found")
 
         status_rows = await session.execute(
@@ -97,11 +97,11 @@ async def connector_stats(connector_id: str):
                 IngestionRun.connector_id == connector_id
             ).group_by(IngestionRun.status)
         )
-        status_counts = {s.value: n for s, n in status_rows.all()}
-        for s in RunStatus:
-            status_counts.setdefault(s.value, 0)
+        status_counts = {status.value: count for status, count in status_rows.all()}
+        for status in RunStatus:
+            status_counts.setdefault(status.value, 0)
 
-        dlq_count = (
+        dead_letter_count = (
             await session.execute(
                 select(func.count()).select_from(DeadLetterEntry).where(
                     DeadLetterEntry.connector_id == connector_id
@@ -117,11 +117,11 @@ async def connector_stats(connector_id: str):
         )
         last_run = (await session.execute(last_run_stmt)).scalar_one_or_none()
 
-        cfg = cd.get_source_config()
-        interval = int(cfg.get("poll_interval_seconds") or 0) or None
+        source_config = connector.get_source_config()
+        interval = int(source_config.get("poll_interval_seconds") or 0) or None
         next_poll_at = None
-        if interval and cd.last_poll_at:
-            last = cd.last_poll_at
+        if interval and connector.last_poll_at:
+            last = connector.last_poll_at
             if last.tzinfo is None:
                 last = last.replace(tzinfo=timezone.utc)
             next_poll_at = last.timestamp() + interval
@@ -129,18 +129,18 @@ async def connector_stats(connector_id: str):
 
         return {
             "connector_id": connector_id,
-            "is_active": cd.is_active,
-            "last_poll_at": utc_iso(cd.last_poll_at),
-            "last_poll_status": cd.last_poll_status,
-            "last_poll_error": cd.last_poll_error,
-            "last_poll_fetched": cd.last_poll_fetched,
-            "last_poll_duration_ms": cd.last_poll_duration_ms,
+            "is_active": connector.is_active,
+            "last_poll_at": utc_iso(connector.last_poll_at),
+            "last_poll_status": connector.last_poll_status,
+            "last_poll_error": connector.last_poll_error,
+            "last_poll_fetched": connector.last_poll_fetched,
+            "last_poll_duration_ms": connector.last_poll_duration_ms,
             "poll_interval_seconds": interval,
             "next_poll_at": utc_iso(next_poll_at),
-            "dlq_count": int(dlq_count or 0),
+            "dlq_count": int(dead_letter_count or 0),
             "run_status_counts": status_counts,
             "total_runs": sum(status_counts.values()),
-            "poll_state": cd.get_poll_state(),
+            "poll_state": connector.get_poll_state(),
             "last_run": {
                 "run_id": last_run.run_id,
                 "status": last_run.status.value,
@@ -157,11 +157,11 @@ async def connector_stats(connector_id: str):
 async def trigger_poll(connector_id: str):
     """Queue an immediate poll for this connector (same task beat would fire)."""
     async with get_session_factory()() as session:
-        cd = await _service.get(connector_id, session)
-        if cd is None:
+        connector = await _service.get(connector_id, session)
+        if connector is None:
             raise HTTPException(404, "Connector not found")
-        if cd.transport_type in _PUSH_TRANSPORTS:
-            raise HTTPException(400, f"{cd.transport_type} connectors are not polled")
+        if connector.transport_type in _PUSH_TRANSPORTS:
+            raise HTTPException(400, f"{connector.transport_type} connectors are not polled")
 
     from ..worker import poll_connector_task
     task = poll_connector_task.delay(connector_id)
@@ -172,10 +172,10 @@ async def trigger_poll(connector_id: str):
 async def reset_cursor(connector_id: str):
     """Clear incremental poll_state_json so the next poll re-fetches from the beginning."""
     async with get_session_factory()() as session:
-        cd = await _service.get(connector_id, session)
-        if cd is None:
+        connector = await _service.get(connector_id, session)
+        if connector is None:
             raise HTTPException(404, "Connector not found")
-        cd.poll_state_json = None
+        connector.poll_state_json = None
         await session.commit()
     return {"connector_id": connector_id, "poll_state": {}}
 
@@ -184,8 +184,8 @@ async def reset_cursor(connector_id: str):
 async def clear_idempotency(connector_id: str):
     """Delete stored idempotency keys so the same source_event_id can be ingested again (e.g. retesting)."""
     async with get_session_factory()() as session:
-        cd = await _service.get(connector_id, session)
-        if cd is None:
+        connector = await _service.get(connector_id, session)
+        if connector is None:
             raise HTTPException(404, "Connector not found")
         result = await session.execute(
             delete(IdempotencyKey).where(IdempotencyKey.connector_id == connector_id)
@@ -206,10 +206,10 @@ async def websub_sync_subscriptions(connector_id: str):
     from ..services.websub_hub_sync import sync_subscriptions_with_hub
 
     async with get_session_factory()() as session:
-        cd = await _service.get(connector_id, session)
-        if cd is None:
+        connector = await _service.get(connector_id, session)
+        if connector is None:
             raise HTTPException(404, "Connector not found")
         try:
-            return await sync_subscriptions_with_hub(cd)
+            return await sync_subscriptions_with_hub(connector)
         except ValueError as e:
             raise HTTPException(400, str(e)) from e

@@ -83,7 +83,7 @@ class IngestionService:
             "source_event_id": source_event_id,
             "platform": connector.platform,
         }
-        t0 = time.perf_counter()
+        started_at = time.perf_counter()
 
         # --- idempotency: return canonical run, bump counter — no new IngestionRun row ---
         if source_event_id:
@@ -114,7 +114,7 @@ class IngestionService:
                     )
                     connector_metrics.ingest_duration.labels(
                         connector_id=connector_id,
-                    ).observe(time.perf_counter() - t0)
+                    ).observe(time.perf_counter() - started_at)
                     return canonical
 
         run = IngestionRun(
@@ -138,7 +138,7 @@ class IngestionService:
                 run, exc, connector, source_event_id, raw_data, session,
                 connector_id=connector_id,
                 error_category="permanent",
-                t_pipeline_start=t0,
+                t_pipeline_start=started_at,
             )
 
         # --- optional pre-ingest validation ---
@@ -151,7 +151,7 @@ class IngestionService:
                     run, exc, connector, source_event_id, raw_data, session,
                     connector_id=connector_id,
                     error_category="validation",
-                    t_pipeline_start=t0,
+                    t_pipeline_start=started_at,
                 )
 
         route = self._resolve_route_targets(
@@ -173,7 +173,7 @@ class IngestionService:
                 run, exc, connector, source_event_id, raw_data, session,
                 connector_id=connector_id,
                 error_category="config",
-                t_pipeline_start=t0,
+                t_pipeline_start=started_at,
             )
 
         self._attach_run_payload(
@@ -196,7 +196,7 @@ class IngestionService:
                 run, exc, connector, source_event_id, raw_data, session,
                 connector_id=connector_id,
                 error_category=category,
-                t_pipeline_start=t0,
+                t_pipeline_start=started_at,
             )
 
         # --- record success ---
@@ -223,15 +223,15 @@ class IngestionService:
         await session.flush()
         connector_metrics.ingest_duration.labels(
             connector_id=connector_id,
-        ).observe(time.perf_counter() - t0)
+        ).observe(time.perf_counter() - started_at)
         return run
 
     def _extract_envelope(
         self, connector: ConnectorDefinition, raw_data: dict[str, Any]
     ) -> dict[str, Any]:
         """Apply optional JMESPath envelope extraction from source_config_json."""
-        cfg = connector.get_source_config()
-        envelope = cfg.get("webhook_payload_envelope") or cfg.get("data_path")
+        source_config = connector.get_source_config()
+        envelope = source_config.get("webhook_payload_envelope") or source_config.get("data_path")
         if envelope:
             result = jmespath.search(envelope, raw_data)
             if isinstance(result, dict):
@@ -353,8 +353,8 @@ class IngestionService:
     @staticmethod
     def _classify_send_error(exc: Exception) -> str:
         """Classify errors from the registry call for DLQ triage."""
-        msg = str(exc).lower()
-        if any(code in msg for code in ("timeout", "connect", "503", "502", "429")):
+        message_text = str(exc).lower()
+        if any(code in message_text for code in ("timeout", "connect", "503", "502", "429")):
             return "transient"
         return "permanent"
 

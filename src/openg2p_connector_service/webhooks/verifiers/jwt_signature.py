@@ -17,9 +17,9 @@ _SIGNATURE_HEADERS = (
 
 
 def _header_value(headers: dict[str, str], *names: str) -> str | None:
-    lower = {k.lower(): v for k, v in headers.items()}
+    lower_headers = {key.lower(): value for key, value in headers.items()}
     for name in names:
-        value = lower.get(name.lower())
+        value = lower_headers.get(name.lower())
         if value:
             return value
     return None
@@ -30,19 +30,24 @@ def _extract_token(headers: dict[str, str]) -> str:
         value = _header_value(headers, name)
         if value:
             return value.strip()
-    auth = _header_value(headers, "authorization", "Authorization")
-    if auth and auth.lower().startswith("bearer "):
-        return auth[7:].strip()
+    authorization_header = _header_value(headers, "authorization", "Authorization")
+    if authorization_header and authorization_header.lower().startswith("bearer "):
+        return authorization_header[7:].strip()
     raise HTTPException(401, "Missing partner JWT signature header")
 
 
-def _load_key_from_jwks(jwks: dict[str, Any], kid: str | None = None):
-    keys = jwks.get("keys") or []
+def _load_key_from_json_web_key_set(
+    json_web_key_set: dict[str, Any], key_id: str | None = None
+):
+    keys = json_web_key_set.get("keys") or []
     if not keys:
-        raise HTTPException(500, "Partner JWKS has no keys")
+        raise HTTPException(500, "Partner JSON Web Key Set has no keys")
     selected = None
-    if kid:
-        selected = next((k for k in keys if k.get("kid") == kid), None)
+    if key_id:
+        selected = next(
+            (entry for entry in keys if entry.get("kid") == key_id),
+            None,
+        )
     selected = selected or keys[0]
     if selected.get("kty") != "RSA":
         raise HTTPException(500, "Only RSA partner keys are supported")
@@ -52,29 +57,41 @@ def _load_key_from_jwks(jwks: dict[str, Any], kid: str | None = None):
 
 
 def _resolve_public_key(secret: str, source_config: dict | None, token: str):
-    cfg = source_config or {}
-    pem = (cfg.get("partner_public_key_pem") or secret or "").strip()
-    jwks_url = (cfg.get("partner_jwks_url") or cfg.get("partner_public_key_url") or "").strip()
+    config = source_config or {}
+    public_key_pem = (
+        config.get("partner_public_key_pem") or secret or ""
+    ).strip()
+    json_web_key_set_url = (
+        config.get("partner_json_web_key_set_url")
+        or config.get("partner_jwks_url")
+        or config.get("partner_public_key_url")
+        or ""
+    ).strip()
 
-    if jwks_url:
+    if json_web_key_set_url:
         try:
-            resp = httpx.get(jwks_url, timeout=10.0)
-            resp.raise_for_status()
-            jwks = resp.json()
+            response = httpx.get(json_web_key_set_url, timeout=10.0)
+            response.raise_for_status()
+            json_web_key_set = response.json()
         except Exception as exc:
-            raise HTTPException(502, f"Failed to fetch partner public key: {exc}") from exc
+            raise HTTPException(
+                502, f"Failed to fetch partner public key: {exc}"
+            ) from exc
         try:
-            header = jwt.get_unverified_header(token)
+            token_header = jwt.get_unverified_header(token)
         except jwt.PyJWTError as exc:
             raise HTTPException(401, f"Invalid JWT header: {exc}") from exc
-        return _load_key_from_jwks(jwks, header.get("kid"))
+        return _load_key_from_json_web_key_set(
+            json_web_key_set, token_header.get("kid")
+        )
 
-    if not pem:
+    if not public_key_pem:
         raise HTTPException(
             500,
-            "jwt_signature requires partner_public_key_pem, partner_jwks_url, or webhook_secret PEM",
+            "jwt_signature requires partner_public_key_pem, "
+            "partner_json_web_key_set_url, or webhook_secret PEM",
         )
-    return pem
+    return public_key_pem
 
 
 def verify_jwt_signature(
@@ -97,12 +114,12 @@ def verify_jwt_signature(
     except jwt.PyJWTError as exc:
         raise HTTPException(401, f"Partner JWT verification failed: {exc}") from exc
 
-    body_sha = claims.get("body_sha256") or claims.get("payload_sha256")
-    if body_sha:
+    body_digest = claims.get("body_sha256") or claims.get("payload_sha256")
+    if body_digest:
         import hmac
 
         expected = hashlib.sha256(body).hexdigest()
-        if not hmac.compare_digest(str(body_sha).lower(), expected.lower()):
+        if not hmac.compare_digest(str(body_digest).lower(), expected.lower()):
             raise HTTPException(403, "Partner JWT body digest mismatch")
 
 

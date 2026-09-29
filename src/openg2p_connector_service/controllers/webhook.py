@@ -39,8 +39,10 @@ async def _resolve_connector(
 def _extract_payload(
     body_json: dict, connector: ConnectorDefinition
 ) -> tuple[str | None, dict]:
-    cfg = connector.get_source_config()
-    data_path = cfg.get("webhook_payload_envelope", cfg.get("data_path"))
+    source_config = connector.get_source_config()
+    data_path = source_config.get(
+        "webhook_payload_envelope", source_config.get("data_path")
+    )
 
     if data_path:
         data = jmespath.search(data_path, body_json)
