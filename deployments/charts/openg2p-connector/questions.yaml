@@ -1,0 +1,70 @@
+questions:
+- variable: global.connectorHostname
+  description: Hostname under which Connector will be accessed
+  type: string
+  label: Connector Hostname
+  group: General
+
+- variable: global.postgresqlHost
+  description: Connector database hostname
+  type: string
+  label: Database Hostname
+  group: Database
+
+- variable: global.connectorDB
+  description: Connector database name
+  type: string
+  label: Database Name
+  group: Database
+
+- variable: global.connectorDBUser
+  description: Connector database user
+  type: string
+  label: Database User
+  group: Database
+
+- variable: global.connectorDBSecret
+  description: Kubernetes secret holding the Connector DB password
+  type: string
+  label: Database Secret
+  group: Database
+
+- variable: global.redisHost
+  description: Redis host used as Celery broker/result backend
+  type: string
+  label: Redis Host
+  group: Redis
+
+- variable: global.partnerApiService
+  description: In-cluster Kubernetes service name for registry Partner API
+  type: string
+  label: Partner API Service
+  group: Registry
+
+- variable: api.enabled
+  description: Run the Connector HTTP API
+  type: boolean
+  default: true
+  label: Enable API
+  group: Workloads
+
+- variable: worker.enabled
+  description: Run the Celery worker
+  type: boolean
+  default: true
+  label: Enable Worker
+  group: Workloads
+
+- variable: beat.enabled
+  description: Run Celery beat (scheduled polls)
+  type: boolean
+  default: true
+  label: Enable Beat
+  group: Workloads
+
+- variable: ui.enabled
+  description: Run the optional Connector UI
+  type: boolean
+  default: false
+  label: Enable UI
+  group: Workloads

@@ -26,8 +26,40 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-sa" (include "openg2p-connector.fullname" .) -}}
 {{- end -}}
 
-{{- define "openg2p-connector.serviceName" -}}
-{{- printf "%s-%s" (include "openg2p-connector.fullname" .) . | trunc 63 | trimSuffix "-" -}}
+{{- define "openg2p-connector.image" -}}
+{{- printf "%s:%s" .Values.image.repository .Values.image.tag -}}
+{{- end -}}
+
+{{- define "openg2p-connector.dbName" -}}
+{{- tpl .Values.global.connectorDB . -}}
+{{- end -}}
+
+{{- define "openg2p-connector.dbUser" -}}
+{{- tpl .Values.global.connectorDBUser . -}}
+{{- end -}}
+
+{{- define "openg2p-connector.dbSecret" -}}
+{{- tpl .Values.global.connectorDBSecret . -}}
+{{- end -}}
+
+{{- define "openg2p-connector.dbPasswordKey" -}}
+{{- tpl .Values.global.connectorDBUserPasswordKey . -}}
+{{- end -}}
+
+{{- define "openg2p-connector.partnerBaseUrl" -}}
+{{- printf "http://%s.%s.svc.cluster.local" .Values.global.partnerApiService .Release.Namespace -}}
+{{- end -}}
+
+{{- define "openg2p-connector.postgresWaitArgs" -}}
+- -c
+- >-
+  until PGPASSWORD="${CONNECTOR_DB_PASSWORD}" psql -q
+  -U "${CONNECTOR_DB_USERNAME}"
+  -h "${CONNECTOR_DB_HOSTNAME}"
+  -p "${CONNECTOR_DB_PORT:-5432}"
+  -d "${CONNECTOR_DB_DBNAME}"
+  -c "SELECT 1" >/dev/null 2>&1;
+  do echo "waiting for postgres credentials to work..."; sleep 3; done
 {{- end -}}
 
 {{- define "openg2p-connector.commonEnv" -}}
@@ -38,20 +70,20 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: CONNECTOR_DB_PORT
   value: {{ .Values.global.postgresqlPort | quote }}
 - name: CONNECTOR_DB_USERNAME
-  value: {{ .Values.global.connectorDBUser | quote }}
+  value: {{ include "openg2p-connector.dbUser" . | quote }}
 - name: CONNECTOR_DB_PASSWORD
   valueFrom:
     secretKeyRef:
-      name: {{ .Values.global.connectorDBSecret | quote }}
-      key: {{ .Values.global.connectorDBUserPasswordKey | quote }}
+      name: {{ include "openg2p-connector.dbSecret" . | quote }}
+      key: {{ include "openg2p-connector.dbPasswordKey" . | quote }}
 - name: CONNECTOR_DB_DBNAME
-  value: {{ .Values.global.connectorDB | quote }}
+  value: {{ include "openg2p-connector.dbName" . | quote }}
 - name: CONNECTOR_PARTNER_INGEST_BASE_URL
-  value: {{ printf "http://%s.%s.svc.cluster.local" .Values.global.partnerApiService .Release.Namespace | quote }}
+  value: {{ include "openg2p-connector.partnerBaseUrl" . | quote }}
 - name: CONNECTOR_CELERY_BROKER_URL
-  value: {{ printf "redis://%s:%v/1" .Values.global.redisHost .Values.global.redisPort | quote }}
+  value: {{ printf "redis://%s:%v/%v" .Values.global.redisHost .Values.global.redisPort .Values.global.redisDb | quote }}
 - name: CONNECTOR_CELERY_RESULT_BACKEND
-  value: {{ printf "redis://%s:%v/1" .Values.global.redisHost .Values.global.redisPort | quote }}
+  value: {{ printf "redis://%s:%v/%v" .Values.global.redisHost .Values.global.redisPort .Values.global.redisDb | quote }}
 - name: CONNECTOR_LOG_LEVEL
   value: {{ .Values.commonEnv.CONNECTOR_LOG_LEVEL | quote }}
 - name: CONNECTOR_STORE_RUN_PAYLOADS

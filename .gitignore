@@ -5,6 +5,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.DS_Store
 
 .env
 .env.*
@@ -16,3 +17,9 @@ celerybeat-schedule.db
 node_modules/
 dist/
 build/
+
+# Helm dependency packages (fetched by `helm dependency update`)
+deployments/charts/*/charts/
+deployments/charts/*/Chart.lock
+*.tgz
+Archive.zip

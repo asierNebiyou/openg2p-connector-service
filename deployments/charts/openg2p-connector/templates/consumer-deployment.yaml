@@ -1,0 +1,36 @@
+{{- if .Values.consumer.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "openg2p-connector.fullname" . }}-consumer
+  labels:
+    {{- include "openg2p-connector.labels" . | nindent 4 }}
+    app.kubernetes.io/component: consumer
+spec:
+  replicas: {{ .Values.consumer.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "openg2p-connector.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: consumer
+  template:
+    metadata:
+      labels:
+        {{- include "openg2p-connector.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: consumer
+    spec:
+      serviceAccountName: {{ include "openg2p-connector.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: connector-consumer
+          image: {{ include "openg2p-connector.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            {{- toYaml .Values.consumer.args | nindent 12 }}
+          env:
+            {{- include "openg2p-connector.commonEnv" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.consumer.resources | nindent 12 }}
+{{- end }}

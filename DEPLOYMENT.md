@@ -1,39 +1,38 @@
 # Connector Deployment
 
-This directory now contains a container image definition for the Connector
-Service that your DevOps team can deploy as one or more runtime roles from the
-same image.
+Layout matches other OpenG2P Gen2 services (see
+[master-data-service](https://github.com/OpenG2P/master-data-service)):
+
+| Path | Purpose |
+|------|---------|
+| `docker/connector-service/` | Image Dockerfile + entrypoint |
+| `deployments/charts/openg2p-connector/` | Helm chart (api / worker / beat) |
+| `.gitlab-ci.yml` | GitLab packaging (image + chart publish) |
+| `deploy.env.example` | Env template for local / manual runs |
 
 ## Files
 
-- `Dockerfile`: builds the Connector image
-- `docker-entrypoint.sh`: selects the runtime role
-- `deploy.env.example`: deployment-oriented env example
+- `docker/connector-service/Dockerfile`: builds the Connector image
+- `docker/connector-service/docker-entrypoint.sh`: selects the runtime role
+- `Dockerfile`: thin root wrapper (`docker build .` still works)
+- `deploy.env.example`: deployment-oriented env template
 
 ## Build
 
-Build the base image:
+Build from the repo root:
 
 ```bash
-docker build -t your-registry/openg2p-connector-service:latest ./openg2p-connector-service
+docker build -f docker/connector-service/Dockerfile \
+  -t your-registry/openg2p-connector-service:latest .
 ```
 
-Build with optional extras when needed:
+Optional extras (if declared in `pyproject.toml`):
 
 ```bash
-docker build \
-  --build-arg CONNECTOR_PIP_EXTRAS=metrics,kafka \
-  -t your-registry/openg2p-connector-service:latest \
-  ./openg2p-connector-service
+docker build -f docker/connector-service/Dockerfile \
+  --build-arg CONNECTOR_PIP_EXTRAS=dev \
+  -t your-registry/openg2p-connector-service:latest .
 ```
-
-Supported extras match `pyproject.toml`:
-
-- `metrics`
-- `kafka`
-- `rabbit`
-- `sqs`
-- `otel`
 
 ## Runtime roles
 
@@ -177,16 +176,30 @@ docker run -d \
   consumer
 ```
 
-## Kubernetes / platform mapping
+## Kubernetes / Helm
 
-Map the same image to separate workloads:
+Use the chart under `deployments/charts/openg2p-connector`:
 
-- Deployment `connector-api` with container args omitted or `["api"]`
-- Deployment `connector-worker` with args `["worker"]`
-- Deployment `connector-beat` with args `["beat"]`
-- Deployment `connector-consumer` with args `["consumer"]` when needed
+```bash
+helm dependency update deployments/charts/openg2p-connector
+helm upgrade --install connector deployments/charts/openg2p-connector \
+  --namespace <ns> \
+  --set global.connectorHostname=connector.example.org \
+  --set global.partnerApiService=registry-partner-api \
+  --set global.redisHost=commons-redis-master \
+  --set image.tag=<tag>
+```
 
-Expose only the API workload via a Service.
+The chart creates:
+
+- Deployment `…-api` with args `["api"]` (+ Service, probes, optional HPA)
+- Deployment `…-worker` with args `["worker"]`
+- Deployment `…-beat` with args `["beat"]`
+- Optional `…-consumer` / `…-ui` when enabled in values
+- `postgres-init` subchart for the connector database
+- Istio VirtualService when `istio.enabled` is true
+
+Expose only the API (and UI if enabled) via Service / VirtualService.
 
 ## Health checks
 

@@ -14,5 +14,5 @@ spec:
         name: http
         protocol: HTTP
       hosts:
-        - {{ .Values.global.hostname | quote }}
+        - {{ .Values.global.connectorHostname | quote }}
 {{- end }}

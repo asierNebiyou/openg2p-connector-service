@@ -1,0 +1,23 @@
+apiVersion: v2
+name: openg2p-connector
+description: Helm chart for OpenG2P Connector Service (API, worker, beat)
+type: application
+version: 0.0.0-develop
+appVersion: "0.1.0"
+dependencies:
+  # Chart templates are self-contained (no bitnami/common helpers).
+  - name: postgres-init
+    version: 1.2.0
+    repository: https://openg2p.github.io/openg2p-helm
+    condition: postgres-init.enabled
+icon: https://openg2p.github.io/openg2p-helm/openg2p-logo.png
+keywords:
+  - openg2p
+  - connector
+  - ingestion
+maintainers:
+  - email: info@openg2p.org
+    name: OpenG2P
+annotations:
+  catalog.cattle.io/display-name: "OpenG2P Connector"
+  openg2p.org/add-to-rancher: ""

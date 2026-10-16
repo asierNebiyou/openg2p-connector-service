@@ -1,0 +1,27 @@
+# openg2p-connector-service — build & publish on GitLab.
+#
+# Aligned with OpenG2P/master-data-service packaging. Versioning/build/publish
+# logic lives in openg2p/packaging@v1; this file declares what THIS repo has.
+#
+#   images -> registry.gitlab.com/openg2p/openg2p-connector-service/<name>
+#   chart  -> openg2p/charts Helm registry
+
+include:
+  - project: 'openg2p/packaging'
+    ref: v1
+    file: '/ci/gitlab/build-publish.yml'
+
+variables:
+  PACKAGING_REF: v1
+
+  IMAGES: |
+    [
+      {
+        "name": "connector-service",
+        "dockerfile": "docker/connector-service/Dockerfile"
+      }
+    ]
+
+  CHART_PATH: deployments/charts/openg2p-connector
+  CHART_IMAGE_PATHS: '[".image.tag"]'
+  CHART_GITLAB_PROJECT: openg2p/charts

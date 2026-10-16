@@ -7,7 +7,7 @@ metadata:
     {{- include "openg2p-connector.labels" . | nindent 4 }}
 spec:
   hosts:
-    - {{ .Values.global.hostname | quote }}
+    - {{ .Values.global.connectorHostname | quote }}
   gateways:
     {{- if .Values.istio.gateway.create }}
     - {{ include "openg2p-connector.fullname" . }}-gateway
@@ -15,6 +15,7 @@ spec:
     - {{ .Values.istio.virtualservice.gateway | quote }}
     {{- end }}
   http:
+    {{- if .Values.ui.enabled }}
     {{- range .Values.istio.virtualservice.apiPrefixes }}
     - match:
         - uri:
@@ -33,4 +34,14 @@ spec:
             host: {{ include "openg2p-connector.fullname" . }}-ui
             port:
               number: {{ .Values.ui.service.port }}
+    {{- else }}
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: {{ include "openg2p-connector.fullname" . }}-api
+            port:
+              number: {{ .Values.api.service.port }}
+    {{- end }}
 {{- end }}

@@ -1,4 +1,10 @@
-FROM python:3.10-slim
+# Convenience wrapper. Prefer the canonical path:
+#   docker build -f docker/connector-service/Dockerfile .
+#
+# This file keeps `docker build .` working from the repo root.
+
+ARG PYTHON_IMAGE=python:3.10-slim
+FROM ${PYTHON_IMAGE}
 
 ARG CONNECTOR_PIP_EXTRAS=""
 
@@ -24,7 +30,7 @@ RUN python -m pip install --upgrade pip setuptools wheel \
         python -m pip install .; \
     fi
 
-COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY docker/connector-service/docker-entrypoint.sh /app/docker-entrypoint.sh
 
 RUN useradd --create-home --home-dir /home/connector --shell /usr/sbin/nologin connector \
     && chmod +x /app/docker-entrypoint.sh \

@@ -29,10 +29,20 @@ python -m openg2p_connector_service.consumer_supervisor
 
 Copy `.env.example` to `.env` and adjust values.
 
-## Container deployment
+## Container / Helm deployment
 
-For a production/deployment-oriented image, runtime roles, and env template,
-see `DEPLOYMENT.md`.
+OpenG2P-style packaging (same layout as master-data-service):
+
+- Image: `docker/connector-service/Dockerfile`
+- Helm: `deployments/charts/openg2p-connector`
+- CI: `.gitlab-ci.yml` (GitLab packaging)
+
+```bash
+docker build -f docker/connector-service/Dockerfile -t openg2p/openg2p-connector-service:develop .
+helm dependency update deployments/charts/openg2p-connector
+```
+
+Runtime roles, env vars, and topology: see `DEPLOYMENT.md`.
 
 ## Architecture
 
